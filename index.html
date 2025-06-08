@@ -123,6 +123,11 @@
             border-radius: 6px;
             font-size: 1em;
             text-align: center;
+            transition: border-color 0.3s;
+        }
+        input[type="number"].input-invalid {
+            border-color: var(--danger-color);
+            box-shadow: 0 0 5px rgba(211, 47, 47, 0.5);
         }
         .output-section {
             background-color: var(--secondary-color);
@@ -174,7 +179,6 @@
             text-align: center;
             margin-top: 25px;
         }
-        /* Hide number input spinners */
         input[type=number] { -moz-appearance: textfield; }
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
@@ -248,22 +252,30 @@
     </div>
 
     <script>
-        // DOM-Elemente abrufen
-        const doorWidthSlider = document.getElementById('doorWidth');
-        const doorWidthValue = document.getElementById('doorWidthValue');
-        const doorHeightSlider = document.getElementById('doorHeight');
-        const doorHeightValue = document.getElementById('doorHeightValue');
-        const diffPressureSlider = document.getElementById('diffPressure');
-        const diffPressureValue = document.getElementById('diffPressureValue');
-        const correctionFactorSlider = document.getElementById('correctionFactor');
-        const correctionFactorValue = document.getElementById('correctionFactorValue');
-        const resetButton = document.getElementById('resetButton');
+        const allInputs = {
+            width: {
+                slider: document.getElementById('doorWidth'),
+                number: document.getElementById('doorWidthValue')
+            },
+            height: {
+                slider: document.getElementById('doorHeight'),
+                number: document.getElementById('doorHeightValue')
+            },
+            pressure: {
+                slider: document.getElementById('diffPressure'),
+                number: document.getElementById('diffPressureValue')
+            },
+            correction: {
+                slider: document.getElementById('correctionFactor'),
+                number: document.getElementById('correctionFactorValue')
+            }
+        };
 
         const resultDisplay = document.getElementById('result');
         const doorAreaDisplay = document.getElementById('doorArea');
         const pressureDisplay = document.getElementById('pressureDisplay');
+        const resetButton = document.getElementById('resetButton');
         
-        // Standardwerte definieren
         const defaultValues = {
             width: 100,
             height: 200,
@@ -271,44 +283,13 @@
             correction: 15
         };
 
-        // Funktion zur Synchronisierung von Slider und Zahlenfeld
-        function syncValues(slider, numberInput) {
-            // Slider aktualisiert das Zahlenfeld in Echtzeit
-            slider.addEventListener('input', () => {
-                numberInput.value = slider.value;
-                calculate();
-            });
-            // Zahlenfeld wird erst nach Abschluss der Eingabe validiert
-            numberInput.addEventListener('change', () => {
-                let value = parseFloat(numberInput.value);
-                const min = parseFloat(numberInput.min);
-                const max = parseFloat(numberInput.max);
-                
-                if (isNaN(value)) {
-                    value = min; // Setze auf Minimum bei ungültiger Eingabe
-                } else if (value > max) {
-                    value = max; // Korrigiere auf Maximum
-                } else if (value < min) {
-                    value = min; // Korrigiere auf Minimum
-                }
-                
-                numberInput.value = value;
-                slider.value = value;
-                calculate();
-            });
-        }
-        
-        syncValues(doorWidthSlider, doorWidthValue);
-        syncValues(doorHeightSlider, doorHeightValue);
-        syncValues(diffPressureSlider, diffPressureValue);
-        syncValues(correctionFactorSlider, correctionFactorValue);
-
-        // Berechnungsfunktion
         function calculate() {
-            const widthM = parseFloat(doorWidthValue.value) / 100;
-            const heightM = parseFloat(doorHeightValue.value) / 100;
-            const pressurePa = parseFloat(diffPressureValue.value);
-            const correction = parseFloat(correctionFactorValue.value) / 100;
+            const widthM = parseFloat(allInputs.width.number.value) / 100;
+            const heightM = parseFloat(allInputs.height.number.value) / 100;
+            const pressurePa = parseFloat(allInputs.pressure.number.value);
+            const correction = parseFloat(allInputs.correction.number.value) / 100;
+
+            if (isNaN(widthM) || isNaN(heightM)) return;
 
             const areaM2 = widthM * heightM;
             const forceFromPressure = areaM2 * pressurePa;
@@ -329,24 +310,60 @@
             }
         }
 
-        // Funktion zum Zurücksetzen auf Standardwerte
+        function setupEventListeners(type) {
+            const slider = allInputs[type].slider;
+            const number = allInputs[type].number;
+            const min = parseFloat(number.min);
+            const max = parseFloat(number.max);
+
+            slider.addEventListener('input', () => {
+                number.value = slider.value;
+                number.classList.remove('input-invalid');
+                calculate();
+            });
+
+            number.addEventListener('input', () => {
+                const value = parseFloat(number.value);
+                if (!isNaN(value) && value >= min && value <= max) {
+                    slider.value = value;
+                    number.classList.remove('input-invalid');
+                    calculate();
+                } else {
+                    number.classList.add('input-invalid');
+                }
+            });
+
+            number.addEventListener('change', () => {
+                let value = parseFloat(number.value);
+                if (isNaN(value) || value < min) {
+                    value = min;
+                } else if (value > max) {
+                    value = max;
+                }
+                number.value = value;
+                slider.value = value;
+                number.classList.remove('input-invalid');
+                calculate();
+            });
+        }
+        
+        Object.keys(allInputs).forEach(setupEventListeners);
+
         function resetToDefaults() {
-            doorWidthSlider.value = defaultValues.width;
-            doorWidthValue.value = defaultValues.width;
-            doorHeightSlider.value = defaultValues.height;
-            doorHeightValue.value = defaultValues.height;
-            diffPressureSlider.value = defaultValues.pressure;
-            diffPressureValue.value = defaultValues.pressure;
-            correctionFactorSlider.value = defaultValues.correction;
-            correctionFactorValue.value = defaultValues.correction;
+            allInputs.width.slider.value = defaultValues.width;
+            allInputs.width.number.value = defaultValues.width;
+            allInputs.height.slider.value = defaultValues.height;
+            allInputs.height.number.value = defaultValues.height;
+            allInputs.pressure.slider.value = defaultValues.pressure;
+            allInputs.pressure.number.value = defaultValues.pressure;
+            allInputs.correction.slider.value = defaultValues.correction;
+            allInputs.correction.number.value = defaultValues.correction;
             
-            calculate(); // Ergebnisse nach dem Zurücksetzen neu berechnen
+            Object.values(allInputs).forEach(pair => pair.number.classList.remove('input-invalid'));
+            calculate();
         }
 
-        // Event Listener für den Reset-Button
         resetButton.addEventListener('click', resetToDefaults);
-        
-        // Initiale Berechnung beim Laden der Seite
         document.addEventListener('DOMContentLoaded', calculate);
     </script>
 </body>
